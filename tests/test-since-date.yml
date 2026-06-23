@@ -1,0 +1,43 @@
+name: Test since-date input
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - id: action
+        uses: .
+        with:
+          fail-on: critical
+          severity: info
+          since: "2024-01-01"
+          version: latest
+
+      - name: Assert evil-merges-found output is set
+        env:
+          FOUND: ${{ steps.action.outputs.evil-merges-found }}
+        run: |
+          echo "evil-merges-found: $FOUND"
+          if [ "$FOUND" != "true" ] && [ "$FOUND" != "false" ]; then
+            echo "FAIL: expected evil-merges-found to be 'true' or 'false', got '$FOUND'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert evil-merge-count output is a number
+        env:
+          COUNT: ${{ steps.action.outputs.evil-merge-count }}
+        run: |
+          echo "evil-merge-count: $COUNT"
+          if ! echo "$COUNT" | grep -qE '^[0-9]+$'; then
+            echo "FAIL: expected evil-merge-count to be a non-negative integer, got '$COUNT'"
+            exit 1
+          fi
+          echo "PASS"

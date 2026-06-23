@@ -1,0 +1,40 @@
+version: 2
+
+project_name: evilmerge
+
+builds:
+  - main: ./cmd/evilmerge
+    binary: evilmerge
+    ldflags:
+      - -s -w -X main.version={{.Version}}
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - formats: ['tar.gz']
+    format_overrides:
+      - goos: windows
+        formats: ['zip']
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+
+checksum:
+  name_template: "checksums.txt"
+
+brews:
+  - name: evilmerge
+    repository:
+      owner: fimskiy
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    homepage: "https://evilmerge.dev"
+    description: "Detect evil merges in Git repositories"
+    install: |
+      bin.install "evilmerge"
+    test: |
+      system "#{bin}/evilmerge", "version"
+

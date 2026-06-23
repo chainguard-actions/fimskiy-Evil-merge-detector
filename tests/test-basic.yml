@@ -1,0 +1,42 @@
+name: Test basic usage - no evil merges
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          fetch-depth: 0
+
+      - id: action
+        uses: .
+        with:
+          fail-on: critical
+          severity: info
+          version: latest
+
+      - name: Assert evil-merges-found is false
+        env:
+          FOUND: ${{ steps.action.outputs.evil-merges-found }}
+        run: |
+          echo "evil-merges-found: $FOUND"
+          if [ "$FOUND" != "false" ]; then
+            echo "FAIL: expected evil-merges-found to be 'false', got '$FOUND'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert evil-merge-count is 0
+        env:
+          COUNT: ${{ steps.action.outputs.evil-merge-count }}
+        run: |
+          echo "evil-merge-count: $COUNT"
+          if [ "$COUNT" != "0" ]; then
+            echo "FAIL: expected evil-merge-count to be '0', got '$COUNT'"
+            exit 1
+          fi
+          echo "PASS"
