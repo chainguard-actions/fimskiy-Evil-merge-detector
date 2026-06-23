@@ -1,0 +1,1 @@
+# fimskiy-Evil-merge-detector
