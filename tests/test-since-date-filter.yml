@@ -1,0 +1,58 @@
+name: Test since date filter - valid date input
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    env:
+      GITHUB_REF: refs/heads/main
+      GITHUB_EVENT_NAME: push
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install mock evilmerge binary
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          cat > "$HOME/.local/bin/evilmerge" << 'EOF'
+          #!/usr/bin/env bash
+          # Mock evilmerge binary: verify --since flag is passed, return empty results
+          for arg in "$@"; do
+            if [[ "$arg" == --since=* ]]; then
+              echo "Received since flag: $arg" >&2
+            fi
+          done
+          echo '{"reports":[]}'
+          EOF
+          chmod +x "$HOME/.local/bin/evilmerge"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - id: action
+        uses: .
+        with:
+          version: prebuilt
+          since: '2024-01-01'
+          severity: info
+          fail-on: warning
+
+      - name: Assert evil-merges-found is false
+        env:
+          ACTUAL: ${{ steps.action.outputs.evil-merges-found }}
+        run: |
+          echo "actual evil-merges-found: $ACTUAL"
+          if [ "$ACTUAL" != "false" ]; then
+            echo "FAIL: expected 'false' but got '$ACTUAL'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert evil-merge-count is 0
+        env:
+          ACTUAL: ${{ steps.action.outputs.evil-merge-count }}
+        run: |
+          echo "actual evil-merge-count: $ACTUAL"
+          if [ "$ACTUAL" != "0" ]; then
+            echo "FAIL: expected '0' but got '$ACTUAL'"
+            exit 1
+          fi
+          echo "PASS"
