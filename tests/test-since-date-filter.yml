@@ -1,0 +1,57 @@
+name: Test since date filter
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install fake evilmerge binary that records its arguments
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          cat > "$HOME/.local/bin/evilmerge" << 'EOF'
+          #!/usr/bin/env bash
+          # Record args to a file for later assertion
+          echo "$@" > /tmp/evilmerge-args.txt
+          echo '{"reports":[]}'
+          exit 0
+          EOF
+          chmod +x "$HOME/.local/bin/evilmerge"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - id: action
+        uses: .
+        with:
+          version: prebuilt
+          since: '2024-01-01'
+          severity: info
+          fail-on: warning
+
+      - name: Assert --since flag was passed to evilmerge
+        run: |
+          ARGS=$(cat /tmp/evilmerge-args.txt)
+          echo "evilmerge args: $ARGS"
+          if ! echo "$ARGS" | grep -q -- '--since=2024-01-01'; then
+            echo "FAIL: expected '--since=2024-01-01' in args but got: $ARGS"
+            exit 1
+          fi
+          echo "PASS: --since flag correctly passed"
+
+      - name: Assert outputs are correct (no evil merges)
+        env:
+          FOUND: ${{ steps.action.outputs.evil-merges-found }}
+          COUNT: ${{ steps.action.outputs.evil-merge-count }}
+        run: |
+          echo "evil-merges-found: $FOUND"
+          echo "evil-merge-count: $COUNT"
+          if [ "$FOUND" != "false" ]; then
+            echo "FAIL: expected found=false but got '$FOUND'"
+            exit 1
+          fi
+          if [ "$COUNT" != "0" ]; then
+            echo "FAIL: expected count=0 but got '$COUNT'"
+            exit 1
+          fi
+          echo "PASS"

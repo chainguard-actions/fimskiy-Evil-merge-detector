@@ -1,0 +1,51 @@
+name: Test evil merges found
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install fake evilmerge binary (returns evil merges, exits 0 since fail-on=critical)
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          cat > "$HOME/.local/bin/evilmerge" << 'EOF'
+          #!/usr/bin/env bash
+          # Fake evilmerge: outputs two evil merge reports and exits 0
+          # (fail-on=critical, these are severity 1=warning, so no failure)
+          echo '{"reports":[{"commit_hash":"abc1234567890","message":"Merge branch feature into main","evil_changes":[{"severity":1,"file_path":"src/main.go","detail":"Line added in merge commit not present in either parent"}]},{"commit_hash":"def9876543210","message":"Merge PR #42","evil_changes":[{"severity":1,"file_path":"src/utils.go","detail":"Function modified in merge commit"}]}]}'
+          exit 0
+          EOF
+          chmod +x "$HOME/.local/bin/evilmerge"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - id: action
+        uses: .
+        with:
+          version: prebuilt
+          fail-on: critical
+          severity: info
+
+      - name: Assert evil-merges-found is true
+        env:
+          ACTUAL: ${{ steps.action.outputs.evil-merges-found }}
+        run: |
+          echo "actual evil-merges-found: $ACTUAL"
+          if [ "$ACTUAL" != "true" ]; then
+            echo "FAIL: expected 'true' but got '$ACTUAL'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert evil-merge-count is 2
+        env:
+          ACTUAL: ${{ steps.action.outputs.evil-merge-count }}
+        run: |
+          echo "actual evil-merge-count: $ACTUAL"
+          if [ "$ACTUAL" != "2" ]; then
+            echo "FAIL: expected '2' but got '$ACTUAL'"
+            exit 1
+          fi
+          echo "PASS"

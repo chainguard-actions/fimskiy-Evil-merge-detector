@@ -1,0 +1,46 @@
+name: Test fail-on threshold - critical only
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install fake evilmerge binary that exits 0 (no critical merges)
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          cat > "$HOME/.local/bin/evilmerge" << 'EOF'
+          #!/usr/bin/env bash
+          # Simulate: found warning-level evil merges but no critical ones
+          # The binary exits 0 because fail-on=critical and none are critical
+          echo '{"reports":[{"commit_hash":"aabbccdd11223344","message":"Merge branch feature","evil_changes":[{"severity":1,"file_path":"README.md","detail":"Minor change in merge commit"}]}]}'
+          exit 0
+          EOF
+          chmod +x "$HOME/.local/bin/evilmerge"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - id: action
+        uses: .
+        with:
+          version: prebuilt
+          fail-on: critical
+          severity: warning
+
+      - name: Assert action succeeded (no critical evil merges)
+        env:
+          FOUND: ${{ steps.action.outputs.evil-merges-found }}
+          COUNT: ${{ steps.action.outputs.evil-merge-count }}
+        run: |
+          echo "evil-merges-found: $FOUND"
+          echo "evil-merge-count: $COUNT"
+          if [ "$FOUND" != "true" ]; then
+            echo "FAIL: expected found=true (warning-level merges exist) but got '$FOUND'"
+            exit 1
+          fi
+          if [ "$COUNT" != "1" ]; then
+            echo "FAIL: expected count=1 but got '$COUNT'"
+            exit 1
+          fi
+          echo "PASS: action succeeded with fail-on=critical and only warning-level merges"
