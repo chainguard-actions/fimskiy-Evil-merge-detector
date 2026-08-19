@@ -1,4 +1,4 @@
-name: Test basic usage - no evil merges
+name: Test evil merges found
 on:
   workflow_dispatch:
 
@@ -8,14 +8,17 @@ jobs:
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - name: Install fake evilmerge binary (clean result)
+      - name: Install fake evilmerge binary (evil merges found)
         run: |
           mkdir -p "$HOME/.local/bin"
           cat > "$HOME/.local/bin/evilmerge" << 'EOF'
           #!/usr/bin/env bash
-          # Fake evilmerge: returns clean JSON (no evil merges found)
-          echo '{"reports":[]}'
-          exit 0
+          # Fake evilmerge: returns JSON with evil merge reports
+          # Exit 1 to simulate evil merges found (fail-on=warning triggers failure)
+          cat << 'JSON'
+          {"reports":[{"commit_hash":"abc1234567890","message":"Merge branch 'feature' into main","evil_changes":[{"severity":1,"file_path":"src/main.go","detail":"Line added in merge commit not present in either parent"}]}]}
+          JSON
+          exit 1
           EOF
           chmod +x "$HOME/.local/bin/evilmerge"
           echo "$HOME/.local/bin" >> "$GITHUB_PATH"
@@ -24,27 +27,28 @@ jobs:
         uses: .
         with:
           version: prebuilt
-          fail-on: warning
+          fail-on: critical
           severity: info
+        continue-on-error: true
 
-      - name: Assert evil-merges-found is false
+      - name: Assert evil-merges-found is true
         env:
           ACTUAL: ${{ steps.action.outputs.evil-merges-found }}
         run: |
           echo "actual evil-merges-found: $ACTUAL"
-          if [ "$ACTUAL" != "false" ]; then
-            echo "FAIL: expected 'false' but got '$ACTUAL'"
+          if [ "$ACTUAL" != "true" ]; then
+            echo "FAIL: expected 'true' but got '$ACTUAL'"
             exit 1
           fi
           echo "PASS"
 
-      - name: Assert evil-merge-count is 0
+      - name: Assert evil-merge-count is 1
         env:
           ACTUAL: ${{ steps.action.outputs.evil-merge-count }}
         run: |
           echo "actual evil-merge-count: $ACTUAL"
-          if [ "$ACTUAL" != "0" ]; then
-            echo "FAIL: expected '0' but got '$ACTUAL'"
+          if [ "$ACTUAL" != "1" ]; then
+            echo "FAIL: expected '1' but got '$ACTUAL'"
             exit 1
           fi
           echo "PASS"

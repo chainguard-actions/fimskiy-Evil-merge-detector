@@ -1,0 +1,59 @@
+name: Test fail-on warning threshold
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install fake evilmerge binary (returns warning-level evil merge, exits 1)
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          cat > "$HOME/.local/bin/evilmerge" << 'EOF'
+          #!/usr/bin/env bash
+          # Simulate finding a WARNING-level evil merge
+          # The --fail-on=warning flag means the binary exits non-zero
+          ARGS="$*"
+          if echo "$ARGS" | grep -q -- "--fail-on=warning"; then
+            cat << 'JSON'
+          {"reports":[{"commit_hash":"deadbeef12345678","message":"Merge branch 'sneaky'","evil_changes":[{"severity":1,"file_path":"lib/util.go","detail":"Undisclosed change in merge commit"}]}]}
+          JSON
+            exit 1
+          fi
+          echo '{"reports":[]}'
+          exit 0
+          EOF
+          chmod +x "$HOME/.local/bin/evilmerge"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - id: action
+        uses: .
+        with:
+          version: prebuilt
+          fail-on: warning
+          severity: info
+        continue-on-error: true
+
+      - name: Assert action failed (evil merges found at warning threshold)
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "failure" ]; then
+            echo "FAIL: expected action to fail when evil merges found at warning threshold, but outcome was '$OUTCOME'"
+            exit 1
+          fi
+          echo "PASS: action correctly failed when evil merges found at warning threshold"
+
+      - name: Assert evil-merges-found is true
+        env:
+          ACTUAL: ${{ steps.action.outputs.evil-merges-found }}
+        run: |
+          echo "actual evil-merges-found: $ACTUAL"
+          if [ "$ACTUAL" != "true" ]; then
+            echo "FAIL: expected 'true' but got '$ACTUAL'"
+            exit 1
+          fi
+          echo "PASS"

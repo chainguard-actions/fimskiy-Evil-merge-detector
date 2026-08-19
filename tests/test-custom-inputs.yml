@@ -1,0 +1,64 @@
+name: Test custom severity, branch, and since inputs
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install fake evilmerge binary that records args
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          cat > "$HOME/.local/bin/evilmerge" << 'EOF'
+          #!/usr/bin/env bash
+          # Record the arguments passed to this binary
+          echo "ARGS: $*" >&2
+          # Check expected flags are present
+          ARGS="$*"
+          MISSING=""
+          echo "$ARGS" | grep -q -- "--severity=warning" || MISSING="$MISSING --severity=warning"
+          echo "$ARGS" | grep -q -- "--branch=main" || MISSING="$MISSING --branch=main"
+          echo "$ARGS" | grep -q -- "--since=2024-01-01" || MISSING="$MISSING --since=2024-01-01"
+          echo "$ARGS" | grep -q -- "--fail-on=critical" || MISSING="$MISSING --fail-on=critical"
+          if [ -n "$MISSING" ]; then
+            echo "MISSING FLAGS: $MISSING" >&2
+            exit 2
+          fi
+          echo '{"reports":[]}'
+          exit 0
+          EOF
+          chmod +x "$HOME/.local/bin/evilmerge"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - id: action
+        uses: .
+        with:
+          version: prebuilt
+          severity: warning
+          fail-on: critical
+          branch: main
+          since: "2024-01-01"
+
+      - name: Assert action succeeded with custom inputs
+        env:
+          OUTCOME: ${{ steps.action.outcome }}
+        run: |
+          echo "outcome: $OUTCOME"
+          if [ "$OUTCOME" != "success" ]; then
+            echo "FAIL: expected action to succeed but outcome was '$OUTCOME'"
+            exit 1
+          fi
+          echo "PASS: action correctly passed custom inputs to evilmerge"
+
+      - name: Assert evil-merges-found is false
+        env:
+          ACTUAL: ${{ steps.action.outputs.evil-merges-found }}
+        run: |
+          echo "actual evil-merges-found: $ACTUAL"
+          if [ "$ACTUAL" != "false" ]; then
+            echo "FAIL: expected 'false' but got '$ACTUAL'"
+            exit 1
+          fi
+          echo "PASS"
