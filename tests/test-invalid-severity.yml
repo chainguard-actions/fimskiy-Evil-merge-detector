@@ -1,22 +1,28 @@
-name: Test invalid severity input causes failure
+name: Test invalid severity input
 on:
   workflow_dispatch:
 jobs:
   test:
     runs-on: ubuntu-latest
-    env:
-      GITHUB_REF: refs/heads/main
-      GITHUB_EVENT_NAME: push
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-        with:
-          fetch-depth: 0
+
+      - name: Install fake evilmerge binary
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          cat > "$HOME/.local/bin/evilmerge" << 'EOF'
+          #!/usr/bin/env bash
+          echo '{"reports":[]}'
+          exit 0
+          EOF
+          chmod +x "$HOME/.local/bin/evilmerge"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - id: action
         uses: .
         with:
-          fail-on: invalid-severity-value
-          version: latest
+          version: prebuilt
+          severity: invalid-value
         continue-on-error: true
 
       - name: Assert action failed due to invalid severity
@@ -28,4 +34,4 @@ jobs:
             echo "FAIL: expected action to fail with invalid severity, but outcome was '$OUTCOME'"
             exit 1
           fi
-          echo "PASS: action correctly failed with invalid severity input"
+          echo "PASS: action correctly failed on invalid severity"

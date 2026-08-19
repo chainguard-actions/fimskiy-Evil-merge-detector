@@ -53,7 +53,7 @@ runs:
     - name: Detect evil merges
       id: scan
       shell: bash
-      run: $GITHUB_ACTION_PATH/action/entrypoint.sh
+      run: "$GITHUB_ACTION_PATH/action/entrypoint.sh"
       env:
         INPUT_FAIL_ON: ${{ inputs.fail-on }}
         INPUT_SEVERITY: ${{ inputs.severity }}
@@ -63,6 +63,6 @@ runs:
         INPUT_UPLOAD_SARIF: ${{ inputs.upload-sarif }}
     - name: Upload SARIF to Code Scanning
       if: always() && inputs.upload-sarif == 'true'
-      uses: github/codeql-action/upload-sarif@dd903d2e4f5405488e5ef1422510ee31c8b32357 # v3
+      uses: github/codeql-action/upload-sarif@b7351df727350dca84cb9d725d57dcf5bc82ba26 # v3
       with:
         sarif_file: evil-merge-results.sarif

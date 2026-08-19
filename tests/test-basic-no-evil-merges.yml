@@ -1,0 +1,49 @@
+name: Test basic usage - no evil merges
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install fake evilmerge binary (no findings)
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          cat > "$HOME/.local/bin/evilmerge" << 'EOF'
+          #!/usr/bin/env bash
+          # Fake evilmerge: returns empty reports (no evil merges found)
+          echo '{"reports":[]}'
+          exit 0
+          EOF
+          chmod +x "$HOME/.local/bin/evilmerge"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - id: action
+        uses: .
+        with:
+          version: prebuilt
+          fail-on: warning
+          severity: info
+
+      - name: Assert evil-merges-found is false
+        env:
+          ACTUAL: ${{ steps.action.outputs.evil-merges-found }}
+        run: |
+          echo "actual evil-merges-found: $ACTUAL"
+          if [ "$ACTUAL" != "false" ]; then
+            echo "FAIL: expected 'false' but got '$ACTUAL'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert evil-merge-count is 0
+        env:
+          ACTUAL: ${{ steps.action.outputs.evil-merge-count }}
+        run: |
+          echo "actual evil-merge-count: $ACTUAL"
+          if [ "$ACTUAL" != "0" ]; then
+            echo "FAIL: expected '0' but got '$ACTUAL'"
+            exit 1
+          fi
+          echo "PASS"

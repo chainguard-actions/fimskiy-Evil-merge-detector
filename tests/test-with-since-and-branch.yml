@@ -1,0 +1,60 @@
+name: Test with since date and branch inputs
+on:
+  workflow_dispatch:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install fake evilmerge binary (records args)
+        run: |
+          mkdir -p "$HOME/.local/bin"
+          cat > "$HOME/.local/bin/evilmerge" << 'EOF'
+          #!/usr/bin/env bash
+          # Record the arguments passed to us for later inspection
+          echo "ARGS: $*" >> /tmp/evilmerge-args.txt
+          echo '{"reports":[]}'
+          exit 0
+          EOF
+          chmod +x "$HOME/.local/bin/evilmerge"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - id: action
+        uses: .
+        with:
+          version: prebuilt
+          since: "2024-01-15"
+          branch: "main"
+          severity: warning
+          fail-on: critical
+
+      - name: Assert evil-merges-found is false
+        env:
+          ACTUAL: ${{ steps.action.outputs.evil-merges-found }}
+        run: |
+          echo "actual evil-merges-found: $ACTUAL"
+          if [ "$ACTUAL" != "false" ]; then
+            echo "FAIL: expected 'false' but got '$ACTUAL'"
+            exit 1
+          fi
+          echo "PASS"
+
+      - name: Assert evilmerge was called with correct args
+        run: |
+          echo "Recorded args:"
+          cat /tmp/evilmerge-args.txt || echo "(no args file)"
+          # Verify --since and --branch were passed
+          if ! grep -q "\-\-since=2024-01-15" /tmp/evilmerge-args.txt; then
+            echo "FAIL: --since=2024-01-15 not found in args"
+            exit 1
+          fi
+          if ! grep -q "\-\-branch=main" /tmp/evilmerge-args.txt; then
+            echo "FAIL: --branch=main not found in args"
+            exit 1
+          fi
+          if ! grep -q "\-\-severity=warning" /tmp/evilmerge-args.txt; then
+            echo "FAIL: --severity=warning not found in args"
+            exit 1
+          fi
+          echo "PASS: all expected args found"
