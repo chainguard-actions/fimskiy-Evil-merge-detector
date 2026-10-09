@@ -16,19 +16,19 @@ Action **fimskiy--Evil-merge-detector/v0.1.5** was hardened automatically. 2 fin
 
 ### script-injection (severity: high)
 
-Sub-rule (a): A ${{ }} expression is directly interpolated inside a run: shell command string. In action.yml, the step 'Detect evil merges' uses `run: ${{ github.action_path }}/action/entrypoint.sh`. Although github.action_path is generally GitHub-controlled, any ${{ ... }} expression directly inside a run: block is a script-injection risk because the value flows through YAML template substitution before the shell ever sees it. The safe alternative is to use the pre-set environment variable `$GITHUB_ACTION_PATH` instead: `run: "$GITHUB_ACTION_PATH/action/entrypoint.sh"`.
+In action.yml, the `run:` block directly interpolates `${{ github.action_path }}` as a shell command string: `run: ${{ github.action_path }}/action/entrypoint.sh`. Per sub-rule (a), any `${{ ... }}` expression inside a `run:` block flows through YAML template substitution before the shell processes it, making it a script-injection risk. The safe alternative is to use the pre-set environment variable `$GITHUB_ACTION_PATH` instead.
 
 Locations:
 
-- `action.yml:42`
+- `action.yml:43`
 
 ### unpinned-uses (severity: high)
 
-The action references `github/codeql-action/upload-sarif@v3`, which uses a mutable version tag (@v3) rather than a full 40-character commit SHA. A supply-chain attacker who compromises the referenced action repository could push malicious code to that tag. It should be pinned to a specific commit SHA, e.g. `github/codeql-action/upload-sarif@<40-char-sha> # v3`.
+The action.yml references `github/codeql-action/upload-sarif@v3`, which uses a mutable version tag (`@v3`) rather than a full 40-character commit SHA. This is vulnerable to supply-chain attacks if the tag is moved. It should be pinned to a specific SHA, e.g. `github/codeql-action/upload-sarif@<40-char-sha> # v3`.
 
 Locations:
 
-- `action.yml:53`
+- `action.yml:52`
 
 ## Iteration Notes
 
@@ -38,5 +38,5 @@ Locations:
 
 **Notes:**
 
-Fixed two findings in hardened/action/action.yml: (1) script-injection: replaced `${{ github.action_path }}/action/entrypoint.sh` with `"$GITHUB_ACTION_PATH/action/entrypoint.sh"` to use the pre-set environment variable instead of a template expression in the run: block; (2) unpinned-uses: pinned `github/codeql-action/upload-sarif@v3` to the full commit SHA `1190a975f95ce23525efb6a3fc21ea29567c1b52` with a `# v3` comment for readability.
+Fixed two findings in hardened/action/action.yml: (1) script-injection: replaced `${{ github.action_path }}/action/entrypoint.sh` with `$GITHUB_ACTION_PATH/action/entrypoint.sh` to avoid YAML template substitution of the expression in the run: block; (2) unpinned-uses: pinned `github/codeql-action/upload-sarif@v3` to its full commit SHA `9f759ee644a3e7c15c1390abf49868036c00067b` with `# v3` comment for readability.
 
